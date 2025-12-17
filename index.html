@@ -279,12 +279,12 @@ function parseCSV(text) {
   const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim().length>0);
   if (lines.length < 2) throw new Error("CSV prea scurt / gol.");
 
-  rawHeaders = splitCSVLine(lines[0], ';').map(h => h.trim()).filter(h => h.length>0);
+  rawHeaders = splitCSVLine(lines[0], ',').map(h => h.trim()).filter(h => h.length>0);
   if (!rawHeaders.includes('comentariu')) rawHeaders.push('comentariu');
 
   const out = [];
   for (let i=1;i<lines.length;i++){
-    const parts = splitCSVLine(lines[i], ';');
+    const parts = splitCSVLine(lines[i], ',');
     const obj = {};
     rawHeaders.forEach((h, idx) => obj[h] = (parts[idx] ?? '').trim());
     out.push(obj);
@@ -509,8 +509,8 @@ function toCSVWide() {
     return da.localeCompare(db);
   });
   const lines = [];
-  lines.push(head.join(';') + ';');
-  for (const r of sorted) lines.push(head.map(h => (r[h] ?? '').toString()).join(';') + ';');
+  lines.push(head.join(',') + ',');
+  for (const r of sorted) lines.push(head.map(h => (r[h] ?? '').toString()).join(',') + ',');
   return lines.join('\n');
 }
 
@@ -584,5 +584,6 @@ window.addEventListener('resize', () => {
 </script>
 </body>
 </html>
+
 
 
