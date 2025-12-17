@@ -3,26 +3,31 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Cheltuieli (SQLite)</title>
+  <title>Cheltuieli !(auto din cheltuieli.csv)</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 20px; line-height: 1.3; }
-    .row { display: grid; grid-template-columns: 1fr; gap: 14px; max-width: 1250px; }
+    .row { display: grid; grid-template-columns: 1fr; gap: 14px; max-width: 1200px; }
     .card { border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
-    .grid2 { display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:10px; }
     .grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
-    @media (max-width: 950px) { .grid, .grid2 { grid-template-columns: 1fr; } }
     label { font-size: 12px; color: #374151; display:block; margin-bottom: 6px; }
-    input, button, textarea { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db; }
+    input, select, button, textarea { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db; }
     textarea { min-height: 42px; resize: vertical; }
     button { cursor:pointer; border: 0; }
     .btn { background:#111827; color:#fff; }
     .btn2 { background:#e5e7eb; color:#111827; }
     .muted { color:#6b7280; font-size: 12px; }
+    .actions { display:flex; gap: 10px; flex-wrap: wrap; }
+    .grid2 { display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:10px; }
+    @media (max-width: 900px) { .grid, .grid2 { grid-template-columns: 1fr; } }
+    .pill { display:inline-block; padding:4px 8px; border-radius:999px; background:#f3f4f6; font-size:12px; }
+    .ok { color:#065f46; }
+    .bad { color:#991b1b; }
     code { background:#f3f4f6; padding:2px 6px; border-radius:8px; }
 
+    /* Chart + list side-by-side */
     .chartAndList { display:grid; grid-template-columns: 2fr 1fr; gap: 14px; align-items: start; }
-    @media (max-width: 1100px) { .chartAndList { grid-template-columns: 1fr; } }
+    @media (max-width: 1050px) { .chartAndList { grid-template-columns: 1fr; } }
     .panelTitle { display:flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 8px 0; }
     .scroll { max-height: 520px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 12px; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -32,17 +37,16 @@
     .mono { font-variant-numeric: tabular-nums; }
     .right { text-align:right; }
     .small { font-size: 11px; color:#6b7280; }
-    .danger { color:#991b1b; }
-    .actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
   </style>
 </head>
 <body>
   <div class="row">
     <div class="card">
-      <h2 style="margin:0 0 8px 0;">Cheltuieli (SQLite)</h2>
+      <h2 style="margin:0 0 8px 0;">Cheltuieli ?(auto-load)</h2>
       <div class="muted">
-        Datele se salvează în <b>cheltuieli.sqlite</b> (local).
-        Rulează: <code>python server.py</code> și deschide <code>http://localhost:8000</code>.
+        Pagina citește automat <b>cheltuieli.csv</b> aflat lângă <b>index.html</b>.
+        <br/>
+        <b>Important:</b> rulează printr-un server local (ex: <code>python -m http.server 8000</code>) și deschide <code>http://localhost:8000/index.html</code>.
       </div>
 
       <div style="height:10px;"></div>
@@ -52,23 +56,20 @@
           <label>Status</label>
           <div id="status" class="muted"></div>
         </div>
+
         <div>
           <label>De la data</label>
           <input id="fromDate" type="date" />
         </div>
+
         <div>
           <label>Până la data</label>
           <input id="toDate" type="date" />
         </div>
+
         <div style="display:flex; align-items:end;">
           <button class="btn2" id="applyRange">Aplică interval</button>
         </div>
-      </div>
-
-      <div style="height:12px;"></div>
-      <div class="actions">
-        <button class="btn2" id="reloadBtn">↻ Reîncarcă</button>
-        <span class="small">Total intrări: <span id="totalCount">0</span></span>
       </div>
 
       <div style="height:14px;"></div>
@@ -84,7 +85,7 @@
             <div class="small"><span id="listCount">0</span> intrări</div>
           </div>
           <div class="small" style="margin:0 0 8px 0;">
-            Cronologic, în intervalul selectat.
+            Lista respectă intervalul selectat (De la / Până la).
           </div>
           <div class="scroll">
             <table>
@@ -94,11 +95,10 @@
                   <th>Categorie</th>
                   <th class="right">Sumă</th>
                   <th>Comentariu</th>
-                  <th></th>
                 </tr>
               </thead>
               <tbody id="expenseTbody">
-                <tr><td colspan="5" class="muted">Încarc date...</td></tr>
+                <tr><td colspan="4" class="muted">Încarc date...</td></tr>
               </tbody>
             </table>
           </div>
@@ -116,9 +116,8 @@
         </div>
 
         <div>
-          <label>Categorie</label>
-          <input id="addCategory" list="catList" placeholder="ex: alimentare" />
-          <datalist id="catList"></datalist>
+          <label>Tip cheltuială</label>
+          <select id="addType"></select>
         </div>
 
         <div>
@@ -135,52 +134,118 @@
       <div style="height:10px;"></div>
 
       <div>
-        <label>Comentariu (opțional)</label>
-        <textarea id="addComment" placeholder="ex: prânz"></textarea>
+        <label>Comentariu (opțional, se salvează pe zi)</label>
+        <textarea id="addComment"></textarea>
+      </div>
+
+      <div style="height:12px;"></div>
+
+      <div class="actions">
+        <button class="btn2" id="downloadBtn">Descarcă cheltuieli_updated.csv</button>
+        <button class="btn2" id="downloadLongBtn">Descarcă cheltuieli_long.csv</button>
       </div>
 
       <div id="addMsg" class="muted" style="margin-top:10px;"></div>
     </div>
   </div>
+<h2>Cheltuieli</h2>
+<button id="saveBtn">💾 Salvează în cheltuieli.csv</button>
+<canvas id="chart"></canvas>
 
 <script>
+async function saveCSVToDisk(csv) {
+  await fetch("/save-csv", { method:"POST", body: csv });
+  alert("Salvat!");
+}
+document.getElementById("saveBtn").onclick = () => saveCSVToDisk("an;luna;zi;test;\n2025;1;1;10;");
+</script>
+
+<script>
+
+
+/** ======= Utilitare CSV ======= **/
+function splitCSVLine(line, delim=';') { return line.split(delim); }
+function toNumber(v) {
+  const s = String(v ?? '').trim();
+  if (!s) return 0;
+  const n = Number(s.replace(',', '.'));
+  return Number.isFinite(n) ? n : 0;
+}
+function pad2(x){ return String(x).padStart(2,'0'); }
+function ymdToISO(y,m,d){ return `${y}-${pad2(m)}-${pad2(d)}`; }
+function isoToYMD(iso){ const [y,m,d]=iso.split('-').map(Number); return {y,m,d}; }
+
 const el = (id) => document.getElementById(id);
+
+/** ======= Stare ======= **/
+let rawHeaders = [];
+let rows = [];
+let categories = [];
 let chart = null;
-let expenses = [];
 
 function setStatus(msg, ok=true){
-  el('status').innerHTML = `<span style="color:${ok ? '#065f46' : '#991b1b'}">${msg}</span>`;
+  el('status').innerHTML = `<span class="${ok ? 'ok':'bad'}">${msg}</span>`;
 }
 
-function pad2(x){ return String(x).padStart(2,'0'); }
-function todayISO(){
-  const d = new Date();
-  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
-}
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim().length>0);
+  if (lines.length < 2) throw new Error("CSV prea scurt / gol.");
 
-function uniq(arr){ return [...new Set(arr)]; }
+  rawHeaders = splitCSVLine(lines[0], ';').map(h => h.trim()).filter(h => h.length>0);
+  if (!rawHeaders.includes('comentariu')) rawHeaders.push('comentariu');
 
-function groupForChart(list){
-  const dates = uniq(list.map(e => e.date)).sort();
-  const cats = uniq(list.map(e => e.category)).sort();
-
-  const map = new Map();
-  for (const e of list){
-    const k = `${e.date}|${e.category}`;
-    map.set(k, (map.get(k) || 0) + Number(e.amount));
+  const out = [];
+  for (let i=1;i<lines.length;i++){
+    const parts = splitCSVLine(lines[i], ';');
+    const obj = {};
+    rawHeaders.forEach((h, idx) => obj[h] = (parts[idx] ?? '').trim());
+    out.push(obj);
   }
-
-  const datasets = cats.map(cat => ({
-    label: cat,
-    data: dates.map(dt => map.get(`${dt}|${cat}`) || 0),
-    stack: 's1'
-  }));
-
-  return { labels: dates, datasets };
+  rows = out;
 }
 
-function renderChart(){
-  const { labels, datasets } = groupForChart(expenses);
+function inferSchema() {
+  categories = rawHeaders.filter(h => !['an','luna','zi','comentariu'].includes(h));
+  el('addType').innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
+function suggestDateRangeDefaults() {
+  if (!rows.length) return;
+  const dates = rows.map(r => ymdToISO(Number(r.an), Number(r.luna), Number(r.zi))).sort();
+  el('fromDate').value = dates[0];
+  el('toDate').value = dates[dates.length-1];
+  el('addDate').value = dates[dates.length-1];
+}
+
+function normalizeForChart(filteredRows) {
+  const data = filteredRows
+    .map(r => ({ iso: ymdToISO(Number(r.an), Number(r.luna), Number(r.zi)), r }))
+    .sort((a,b) => a.iso.localeCompare(b.iso));
+
+  const labels = data.map(x => x.iso);
+  const datasets = categories.map(cat => ({
+    label: cat,
+    data: data.map(x => toNumber(x.r[cat])),
+    stack: 'stack1'
+  }));
+  return { labels, datasets };
+}
+
+function getFilteredRowsByRange() {
+  const f = el('fromDate').value || null;
+  const t = el('toDate').value || null;
+  return rows.filter(r => {
+    const iso = ymdToISO(Number(r.an), Number(r.luna), Number(r.zi));
+    if (f && iso < f) return false;
+    if (t && iso > t) return false;
+    return true;
+  });
+}
+
+function renderChart() {
+  const filtered = getFilteredRowsByRange();
+  const { labels, datasets } = normalizeForChart(filtered);
+
   if (chart) chart.destroy();
   chart = new Chart(el('chart'), {
     type: 'bar',
@@ -188,121 +253,185 @@ function renderChart(){
     options: {
       responsive: true,
       interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { position: 'bottom' } },
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: { callbacks: {
+          footer: (items) => {
+            const sum = items.reduce((acc, it) => acc + (it.parsed.y || 0), 0);
+            return `Total zi: ${sum.toFixed(2)}`;
+          }
+        }}
+      },
       scales: { x: { stacked:true }, y: { stacked:true, beginAtZero:true } }
     }
   });
 }
 
-function esc(s){
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function buildExpenseEntries(filteredRows) {
+  // transformă formatul wide (o zi cu multe coloane) într-o listă "long"
+  const entries = [];
+  for (const r of filteredRows) {
+    const date = ymdToISO(Number(r.an), Number(r.luna), Number(r.zi));
+    const comment = (r.comentariu ?? '').toString().trim();
+    for (const c of categories) {
+      const amount = toNumber(r[c]);
+      if (amount !== 0) {
+        entries.push({ date, category: c, amount, comment });
+      }
+    }
+  }
+  entries.sort((a,b) => a.date.localeCompare(b.date) || a.category.localeCompare(b.category));
+  return entries;
 }
 
-function renderList(){
-  el('listCount').textContent = String(expenses.length);
-  el('totalCount').textContent = String(expenses.length);
+function renderExpenseList() {
+  const filtered = getFilteredRowsByRange();
+  const entries = buildExpenseEntries(filtered);
+
+  el('listCount').textContent = String(entries.length);
 
   const tbody = el('expenseTbody');
-  if (!expenses.length){
-    tbody.innerHTML = `<tr><td colspan="5" class="muted">Nu există cheltuieli în interval.</td></tr>`;
+  if (!entries.length) {
+    tbody.innerHTML = `<tr><td colspan="4" class="muted">Nu există cheltuieli în intervalul selectat.</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = expenses.map(e => `
-    <tr>
-      <td class="mono">${esc(e.date)}</td>
-      <td>${esc(e.category)}</td>
-      <td class="right mono">${Number(e.amount).toFixed(2)}</td>
-      <td>${esc(e.comment || '')}</td>
-      <td class="right">
-        <button class="btn2" data-del="${e.id}" title="Șterge">✕</button>
-      </td>
-    </tr>
-  `).join('');
-
-  tbody.querySelectorAll('button[data-del]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-del');
-      if (!confirm('Ștergi această cheltuială?')) return;
-      const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
-      if (!res.ok) { alert('Eroare la ștergere'); return; }
-      await loadAll();
-    });
-  });
+  tbody.innerHTML = entries.map(e => {
+    const comm = e.comment ? e.comment.replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+    return `
+      <tr>
+        <td class="mono">${e.date}</td>
+        <td>${e.category}</td>
+        <td class="right mono">${e.amount.toFixed(2)}</td>
+        <td>${comm}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
-async function loadCategories(){
-  const res = await fetch('/api/categories', { cache: 'no-store' });
-  if (!res.ok) return;
-  const cats = await res.json();
-  el('catList').innerHTML = cats.map(c => `<option value="${esc(c)}"></option>`).join('');
-}
+/** ======= Add/update ======= **/
+function addExpense() {
+  if (!rows.length) { el('addMsg').innerHTML = '<span class="bad">Nu am date încă.</span>'; return; }
 
-async function loadAll(){
-  const f = el('fromDate').value || '';
-  const t = el('toDate').value || '';
-  const qs = new URLSearchParams();
-  if (f) qs.set('from', f);
-  if (t) qs.set('to', t);
+  const iso = el('addDate').value;
+  const type = el('addType').value;
+  const amount = toNumber(el('addAmount').value);
+  const comment = (el('addComment').value || '').trim();
 
-  setStatus('Încarc...', true);
-  const res = await fetch('/api/expenses?' + qs.toString(), { cache: 'no-store' });
-  if (!res.ok){
-    setStatus('Eroare la încărcare /api/expenses', false);
-    return;
+  if (!iso) return el('addMsg').innerHTML = '<span class="bad">Alege o dată.</span>';
+  if (!type) return el('addMsg').innerHTML = '<span class="bad">Alege un tip.</span>';
+  if (!(amount > 0)) return el('addMsg').innerHTML = '<span class="bad">Introdu o sumă > 0.</span>';
+
+  const { y, m, d } = isoToYMD(iso);
+
+  let row = rows.find(r => Number(r.an)===y && Number(r.luna)===m && Number(r.zi)===d);
+  if (!row) {
+    row = {};
+    rawHeaders.forEach(h => row[h] = '');
+    row.an = String(y);
+    row.luna = String(m);
+    row.zi = String(d);
+    categories.forEach(c => row[c] = '0');
+    row.comentariu = '';
+    rows.push(row);
   }
-  expenses = await res.json();
-  setStatus(`OK: ${expenses.length} intrări`, true);
 
-  renderChart();
-  renderList();
-  await loadCategories();
-}
+  const prev = toNumber(row[type]);
+  row[type] = String((prev + amount).toFixed(2));
 
-async function addExpense(){
-  const date = el('addDate').value;
-  const category = el('addCategory').value.trim();
-  const amount = Number(el('addAmount').value);
-  const comment = el('addComment').value.trim();
-
-  if (!date) return el('addMsg').innerHTML = '<span class="danger">Alege o dată.</span>';
-  if (!category) return el('addMsg').innerHTML = '<span class="danger">Scrie o categorie.</span>';
-  if (!(amount > 0)) return el('addMsg').innerHTML = '<span class="danger">Introdu o sumă > 0.</span>';
-
-  const res = await fetch('/api/expenses', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ date, category, amount, comment })
-  });
-
-  const payload = await res.json().catch(()=>null);
-  if (!res.ok){
-    el('addMsg').innerHTML = `<span class="danger">Eroare:</span> ${esc(payload?.error || 'necunoscut')}`;
-    return;
+  if (comment) {
+    const prevC = (row.comentariu || '').trim();
+    row.comentariu = prevC ? `${prevC} | ${comment}` : comment;
   }
 
   el('addAmount').value = '';
   el('addComment').value = '';
-  el('addMsg').innerHTML = `<span style="color:#065f46">OK</span> (id=${payload.id})`;
-  await loadAll();
+  el('addMsg').innerHTML = `<span class="ok">OK:</span> ${iso} +${amount.toFixed(2)} la <b>${type}</b>.`;
+
+  // refresh UI
+  renderChart();
+  renderExpenseList();
 }
 
-window.addEventListener('load', async () => {
-  el('addDate').value = todayISO();
+/** ======= Export ======= **/
+function toCSVWide() {
+  const head = ['an','luna','zi', ...categories, 'comentariu'];
+  const sorted = rows.slice().sort((a,b) => {
+    const da = ymdToISO(+a.an,+a.luna,+a.zi);
+    const db = ymdToISO(+b.an,+b.luna,+b.zi);
+    return da.localeCompare(db);
+  });
+  const lines = [];
+  lines.push(head.join(';') + ';');
+  for (const r of sorted) lines.push(head.map(h => (r[h] ?? '').toString()).join(';') + ';');
+  return lines.join('\n');
+}
 
-  const d = new Date();
-  const to = todayISO();
-  d.setDate(d.getDate() - 30);
-  const from = `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
-  el('fromDate').value = from;
-  el('toDate').value = to;
+function toCSVLong() {
+  const lines = ['data;tip;suma;comentariu'];
+  const sorted = rows.slice().sort((a,b) => {
+    const da = ymdToISO(+a.an,+a.luna,+a.zi);
+    const db = ymdToISO(+b.an,+b.luna,+b.zi);
+    return da.localeCompare(db);
+  });
+  for (const r of sorted) {
+    const iso = ymdToISO(+r.an,+r.luna,+r.zi);
+    const comm = (r.comentariu ?? '').toString().replace(/\n/g, ' ').trim();
+    for (const c of categories) {
+      const v = toNumber(r[c]);
+      if (v !== 0) lines.push(`${iso};${c};${v.toFixed(2)};${comm}`);
+    }
+  }
+  return lines.join('\n');
+}
 
-  await loadAll();
+function downloadText(filename, text) {
+  const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** ======= Auto-load cheltuieli.csv ======= **/
+async function loadCSV() {
+  const res = await fetch('cheltuieli.csv', { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Nu pot citi cheltuieli.csv (HTTP ${res.status}).`);
+  const text = await res.text();
+
+  parseCSV(text);
+  inferSchema();
+  suggestDateRangeDefaults();
+  renderChart();
+  renderExpenseList();
+
+  setStatus(`Încărcat automat cheltuieli.csv (${rows.length} zile)`, true);
+}
+
+window.addEventListener('load', () => {
+  setStatus('Încerc să încarc automat cheltuieli.csv ...', true);
+  loadCSV().catch(err => {
+    console.error(err);
+    setStatus(
+      `Eroare la încărcare automată: ${err.message}<br/>
+      <span class="muted">Rulează din folderul cu fișierele:</span>
+      <br/><code>python -m http.server 8000</code>
+      <br/><span class="muted">Apoi deschide:</span> <code>http://localhost:8000/index.html</code>`,
+      false
+    );
+    el('expenseTbody').innerHTML = `<tr><td colspan="4" class="muted">Nu s-au putut încărca datele.</td></tr>`;
+  });
 });
 
-el('applyRange').addEventListener('click', loadAll);
-el('reloadBtn').addEventListener('click', loadAll);
+/** ======= UI hooks ======= **/
+el('applyRange').addEventListener('click', () => { renderChart(); renderExpenseList(); });
 el('addBtn').addEventListener('click', addExpense);
+el('downloadBtn').addEventListener('click', () => downloadText('cheltuieli_updated.csv', toCSVWide()));
+el('downloadLongBtn').addEventListener('click', () => downloadText('cheltuieli_long.csv', toCSVLong()));
 </script>
 </body>
 </html>
