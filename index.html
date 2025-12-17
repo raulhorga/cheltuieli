@@ -148,9 +148,6 @@
       <div id="addMsg" class="muted" style="margin-top:10px;"></div>
     </div>
   </div>
-
-<script>
-
 <h2>Cheltuieli</h2>
 <button id="saveBtn">💾 Salvează în cheltuieli.csv</button>
 <canvas id="chart"></canvas>
@@ -162,6 +159,10 @@ async function saveCSVToDisk(csv) {
 }
 document.getElementById("saveBtn").onclick = () => saveCSVToDisk("an;luna;zi;test;\n2025;1;1;10;");
 </script>
+
+<script>
+
+
 /** ======= Utilitare CSV ======= **/
 function splitCSVLine(line, delim=';') { return line.split(delim); }
 function toNumber(v) {
