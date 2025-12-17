@@ -3,21 +3,21 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Cheltuieli !(auto din cheltuieli.csv)</title>
+  <title>Cheltuieli (auto din cheltuieli.csv)</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 20px; line-height: 1.3; }
-    .row { display: grid; grid-template-columns: 1fr; gap: 14px; max-width: 1200px; }
+    .row { display: grid; grid-template-columns: 1fr; gap: 14px; max-width: 1300px; }
     .card { border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
     .grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
     label { font-size: 12px; color: #374151; display:block; margin-bottom: 6px; }
-    input, select, button, textarea { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db; }
+    input, select, button, textarea { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db; background: #fff; }
     textarea { min-height: 42px; resize: vertical; }
     button { cursor:pointer; border: 0; }
     .btn { background:#111827; color:#fff; }
     .btn2 { background:#e5e7eb; color:#111827; }
     .muted { color:#6b7280; font-size: 12px; }
-    .actions { display:flex; gap: 10px; flex-wrap: wrap; }
+    .actions { display:flex; gap: 10px; flex-wrap: wrap; align-items: center; }
     .grid2 { display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:10px; }
     @media (max-width: 900px) { .grid, .grid2 { grid-template-columns: 1fr; } }
     .pill { display:inline-block; padding:4px 8px; border-radius:999px; background:#f3f4f6; font-size:12px; }
@@ -26,10 +26,10 @@
     code { background:#f3f4f6; padding:2px 6px; border-radius:8px; }
 
     /* Chart + list side-by-side */
-    .chartAndList { display:grid; grid-template-columns: 2fr 1fr; gap: 14px; align-items: start; }
-    @media (max-width: 1050px) { .chartAndList { grid-template-columns: 1fr; } }
+    .chartAndList { display:grid; grid-template-columns: 2fr 1.15fr; gap: 14px; align-items: start; }
+    @media (max-width: 1100px) { .chartAndList { grid-template-columns: 1fr; } }
     .panelTitle { display:flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 8px 0; }
-    .scroll { max-height: 520px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 12px; }
+    .scroll { max-height: 560px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 12px; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
     thead th { position: sticky; top: 0; background: #fafafa; border-bottom: 1px solid #e5e7eb; text-align: left; padding: 10px; }
     tbody td { border-bottom: 1px solid #f0f0f0; padding: 10px; vertical-align: top; }
@@ -37,16 +37,19 @@
     .mono { font-variant-numeric: tabular-nums; }
     .right { text-align:right; }
     .small { font-size: 11px; color:#6b7280; }
+
+    .filters { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin: 0 0 10px 0; }
+    @media (max-width: 1100px) { .filters { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <div class="row">
     <div class="card">
-      <h2 style="margin:0 0 8px 0;">Cheltuieli ?(auto-load)</h2>
+      <h2 style="margin:0 0 8px 0;">Cheltuieli (auto-load)</h2>
       <div class="muted">
         Pagina citește automat <b>cheltuieli.csv</b> aflat lângă <b>index.html</b>.
         <br/>
-        <b>Important:</b> rulează printr-un server local (ex: <code>python -m http.server 8000</code>) și deschide <code>http://localhost:8000/index.html</code>.
+        <b>Important:</b> rulează printr-un server local (ex: <code>python server.py</code> sau <code>python -m http.server 8000</code> dacă NU folosești butonul de salvare) și deschide <code>http://localhost:8000</code>.
       </div>
 
       <div style="height:10px;"></div>
@@ -72,11 +75,21 @@
         </div>
       </div>
 
+      <div style="height:12px;"></div>
+      <div class="actions">
+        <button class="btn" id="saveLocalBtn">💾 Salvează în cheltuieli.csv (suprascrie)</button>
+        <button class="btn2" id="reloadBtn">↻ Reîncarcă din cheltuieli.csv</button>
+        <span class="small" id="saveInfo"></span>
+      </div>
+
       <div style="height:14px;"></div>
 
       <div class="chartAndList">
         <div>
           <canvas id="chart"></canvas>
+          <div class="small muted" style="margin-top:6px;">
+            Deasupra fiecărei bare vezi totalul cheltuit în ziua respectivă.
+          </div>
         </div>
 
         <div>
@@ -84,9 +97,31 @@
             <h3 style="margin:0;">Lista cheltuieli</h3>
             <div class="small"><span id="listCount">0</span> intrări</div>
           </div>
-          <div class="small" style="margin:0 0 8px 0;">
-            Lista respectă intervalul selectat (De la / Până la).
+
+          <div class="filters">
+            <div>
+              <label>Luna</label>
+              <select id="monthFilter"></select>
+            </div>
+            <div>
+              <label>Tip cheltuială</label>
+              <select id="typeFilter"></select>
+            </div>
+            <div>
+              <label>Sortare</label>
+              <select id="sortFilter">
+                <option value="date_asc">Data ↑</option>
+                <option value="date_desc">Data ↓</option>
+                <option value="amount_desc">Sumă ↓</option>
+                <option value="amount_asc">Sumă ↑</option>
+              </select>
+            </div>
           </div>
+
+          <div class="small" style="margin:0 0 8px 0;">
+            Filtrele afectează doar lista (graficul rămâne pe intervalul De la / Până la).
+          </div>
+
           <div class="scroll">
             <table>
               <thead>
@@ -148,21 +183,8 @@
       <div id="addMsg" class="muted" style="margin-top:10px;"></div>
     </div>
   </div>
-<h2>Cheltuieli</h2>
-<button id="saveBtn">💾 Salvează în cheltuieli.csv</button>
-<canvas id="chart"></canvas>
 
 <script>
-async function saveCSVToDisk(csv) {
-  await fetch("/save-csv", { method:"POST", body: csv });
-  alert("Salvat!");
-}
-document.getElementById("saveBtn").onclick = () => saveCSVToDisk("an;luna;zi;test;\n2025;1;1;10;");
-</script>
-
-<script>
-
-
 /** ======= Utilitare CSV ======= **/
 function splitCSVLine(line, delim=';') { return line.split(delim); }
 function toNumber(v) {
@@ -174,6 +196,7 @@ function toNumber(v) {
 function pad2(x){ return String(x).padStart(2,'0'); }
 function ymdToISO(y,m,d){ return `${y}-${pad2(m)}-${pad2(d)}`; }
 function isoToYMD(iso){ const [y,m,d]=iso.split('-').map(Number); return {y,m,d}; }
+function isoToYM(iso){ return iso.slice(0,7); } // YYYY-MM
 
 const el = (id) => document.getElementById(id);
 
@@ -182,6 +205,56 @@ let rawHeaders = [];
 let rows = [];
 let categories = [];
 let chart = null;
+
+/** Plugin Chart.js: totalul pe zi deasupra barei */
+const totalsPlugin = {
+  id: 'totalsPlugin',
+  afterDatasetsDraw(chart, args, pluginOptions) {
+    const { ctx } = chart;
+    const datasets = chart.data.datasets || [];
+    if (!datasets.length) return;
+
+    const meta0 = chart.getDatasetMeta(0);
+    if (!meta0 || !meta0.data) return;
+
+    // total per index (zi)
+    const totals = meta0.data.map((_, i) => {
+      let sum = 0;
+      for (const ds of datasets) {
+        const v = Number(ds.data?.[i] ?? 0);
+        if (Number.isFinite(v)) sum += v;
+      }
+      return sum;
+    });
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto, Arial';
+
+    for (let i = 0; i < meta0.data.length; i++) {
+      const total = totals[i];
+      if (total <= 0) continue;
+
+      // y = top of stack = min of all dataset y's at that index
+      let yTop = null;
+      let x = null;
+      for (let di = 0; di < datasets.length; di++) {
+        const m = chart.getDatasetMeta(di);
+        const pt = m?.data?.[i];
+        if (!pt) continue;
+        const p = pt.getProps(['x','y'], true);
+        x = p.x;
+        yTop = (yTop === null) ? p.y : Math.min(yTop, p.y);
+      }
+      if (x === null || yTop === null) continue;
+
+      // mic offset ca să nu se lipească de bară
+      ctx.fillText(total.toFixed(2), x, yTop - 6);
+    }
+    ctx.restore();
+  }
+};
 
 function setStatus(msg, ok=true){
   el('status').innerHTML = `<span class="${ok ? 'ok':'bad'}">${msg}</span>`;
@@ -217,6 +290,17 @@ function suggestDateRangeDefaults() {
   el('addDate').value = dates[dates.length-1];
 }
 
+function getFilteredRowsByRange() {
+  const f = el('fromDate').value || null;
+  const t = el('toDate').value || null;
+  return rows.filter(r => {
+    const iso = ymdToISO(Number(r.an), Number(r.luna), Number(r.zi));
+    if (f && iso < f) return false;
+    if (t && iso > t) return false;
+    return true;
+  });
+}
+
 function normalizeForChart(filteredRows) {
   const data = filteredRows
     .map(r => ({ iso: ymdToISO(Number(r.an), Number(r.luna), Number(r.zi)), r }))
@@ -229,17 +313,6 @@ function normalizeForChart(filteredRows) {
     stack: 'stack1'
   }));
   return { labels, datasets };
-}
-
-function getFilteredRowsByRange() {
-  const f = el('fromDate').value || null;
-  const t = el('toDate').value || null;
-  return rows.filter(r => {
-    const iso = ymdToISO(Number(r.an), Number(r.luna), Number(r.zi));
-    if (f && iso < f) return false;
-    if (t && iso > t) return false;
-    return true;
-  });
 }
 
 function renderChart() {
@@ -263,36 +336,78 @@ function renderChart() {
         }}
       },
       scales: { x: { stacked:true }, y: { stacked:true, beginAtZero:true } }
-    }
+    },
+    plugins: [totalsPlugin]
   });
 }
 
 function buildExpenseEntries(filteredRows) {
-  // transformă formatul wide (o zi cu multe coloane) într-o listă "long"
+  // wide -> long
   const entries = [];
   for (const r of filteredRows) {
     const date = ymdToISO(Number(r.an), Number(r.luna), Number(r.zi));
+    const ym = isoToYM(date);
     const comment = (r.comentariu ?? '').toString().trim();
     for (const c of categories) {
       const amount = toNumber(r[c]);
-      if (amount !== 0) {
-        entries.push({ date, category: c, amount, comment });
-      }
+      if (amount !== 0) entries.push({ date, ym, category: c, amount, comment });
     }
   }
   entries.sort((a,b) => a.date.localeCompare(b.date) || a.category.localeCompare(b.category));
   return entries;
 }
 
-function renderExpenseList() {
-  const filtered = getFilteredRowsByRange();
-  const entries = buildExpenseEntries(filtered);
+function populateListFilters(allEntries) {
+  const months = Array.from(new Set(allEntries.map(e => e.ym))).sort();
+  const types = Array.from(new Set(allEntries.map(e => e.category))).sort();
 
+  // păstrăm selecția curentă dacă încă există
+  const prevMonth = el('monthFilter').value;
+  const prevType = el('typeFilter').value;
+
+  el('monthFilter').innerHTML = ['<option value="__all__">Toate</option>', ...months.map(m => `<option value="${m}">${m}</option>`)].join('');
+  el('typeFilter').innerHTML = ['<option value="__all__">Toate</option>', ...types.map(t => `<option value="${t}">${t}</option>`)].join('');
+
+  if (prevMonth && months.includes(prevMonth)) el('monthFilter').value = prevMonth;
+  else el('monthFilter').value = '__all__';
+
+  if (prevType && types.includes(prevType)) el('typeFilter').value = prevType;
+  else el('typeFilter').value = '__all__';
+}
+
+function applyEntryFiltersAndSort(entries) {
+  const month = el('monthFilter').value;
+  const type = el('typeFilter').value;
+  const sort = el('sortFilter').value;
+
+  let out = entries.slice();
+
+  if (month && month !== '__all__') out = out.filter(e => e.ym === month);
+  if (type && type !== '__all__') out = out.filter(e => e.category === type);
+
+  out.sort((a,b) => {
+    if (sort === 'date_asc') return a.date.localeCompare(b.date) || a.category.localeCompare(b.category) || (a.amount - b.amount);
+    if (sort === 'date_desc') return b.date.localeCompare(a.date) || a.category.localeCompare(b.category) || (b.amount - a.amount);
+    if (sort === 'amount_desc') return (b.amount - a.amount) || b.date.localeCompare(a.date) || a.category.localeCompare(b.category);
+    if (sort === 'amount_asc') return (a.amount - b.amount) || a.date.localeCompare(b.date) || a.category.localeCompare(b.category);
+    return 0;
+  });
+
+  return out;
+}
+
+function renderExpenseList() {
+  const filteredRows = getFilteredRowsByRange();
+  const allEntries = buildExpenseEntries(filteredRows);
+
+  populateListFilters(allEntries);
+
+  const entries = applyEntryFiltersAndSort(allEntries);
   el('listCount').textContent = String(entries.length);
 
   const tbody = el('expenseTbody');
   if (!entries.length) {
-    tbody.innerHTML = `<tr><td colspan="4" class="muted">Nu există cheltuieli în intervalul selectat.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="muted">Nu există cheltuieli în filtrul curent.</td></tr>`;
     return;
   }
 
@@ -409,29 +524,50 @@ async function loadCSV() {
   renderChart();
   renderExpenseList();
 
-  setStatus(`Încărcat automat cheltuieli.csv (${rows.length} zile)`, true);
+  setStatus(`Încărcat cheltuieli.csv (${rows.length} zile)`, true);
 }
 
+/** ======= Save to disk (necesită backend) ======= **/
+async function saveCSVToDisk() {
+  const csv = toCSVWide();
+  el('saveInfo').textContent = 'Salvez...';
+  const res = await fetch('/save-csv', {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    body: csv
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    el('saveInfo').textContent = '';
+    alert(`Eroare la salvare (HTTP ${res.status})\n\n${text}`);
+    return;
+  }
+  let payload = null;
+  try { payload = JSON.parse(text); } catch {}
+  el('saveInfo').textContent = payload?.bytes_written ? `Salvat (${payload.bytes_written} bytes)` : 'Salvat.';
+}
+
+/** ======= UI hooks ======= **/
 window.addEventListener('load', () => {
-  setStatus('Încerc să încarc automat cheltuieli.csv ...', true);
+  setStatus('Încarc cheltuieli.csv ...', true);
   loadCSV().catch(err => {
     console.error(err);
-    setStatus(
-      `Eroare la încărcare automată: ${err.message}<br/>
-      <span class="muted">Rulează din folderul cu fișierele:</span>
-      <br/><code>python -m http.server 8000</code>
-      <br/><span class="muted">Apoi deschide:</span> <code>http://localhost:8000/index.html</code>`,
-      false
-    );
+    setStatus(`Eroare: ${err.message}`, false);
     el('expenseTbody').innerHTML = `<tr><td colspan="4" class="muted">Nu s-au putut încărca datele.</td></tr>`;
   });
 });
 
-/** ======= UI hooks ======= **/
 el('applyRange').addEventListener('click', () => { renderChart(); renderExpenseList(); });
 el('addBtn').addEventListener('click', addExpense);
 el('downloadBtn').addEventListener('click', () => downloadText('cheltuieli_updated.csv', toCSVWide()));
 el('downloadLongBtn').addEventListener('click', () => downloadText('cheltuieli_long.csv', toCSVLong()));
+el('saveLocalBtn').addEventListener('click', saveCSVToDisk);
+el('reloadBtn').addEventListener('click', () => loadCSV());
+
+// list filters
+el('monthFilter').addEventListener('change', renderExpenseList);
+el('typeFilter').addEventListener('change', renderExpenseList);
+el('sortFilter').addEventListener('change', renderExpenseList);
 </script>
 </body>
 </html>
