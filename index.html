@@ -7,7 +7,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 20px; line-height: 1.3; }
-    .row { display: grid; grid-template-columns: 1fr; gap: 14px; max-width: 1100px; }
+    .row { display: grid; grid-template-columns: 1fr; gap: 14px; max-width: 1200px; }
     .card { border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
     .grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
     label { font-size: 12px; color: #374151; display:block; margin-bottom: 6px; }
@@ -20,11 +20,23 @@
     .actions { display:flex; gap: 10px; flex-wrap: wrap; }
     .grid2 { display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:10px; }
     @media (max-width: 900px) { .grid, .grid2 { grid-template-columns: 1fr; } }
-    canvas { max-height: 520px; }
     .pill { display:inline-block; padding:4px 8px; border-radius:999px; background:#f3f4f6; font-size:12px; }
     .ok { color:#065f46; }
     .bad { color:#991b1b; }
     code { background:#f3f4f6; padding:2px 6px; border-radius:8px; }
+
+    /* Chart + list side-by-side */
+    .chartAndList { display:grid; grid-template-columns: 2fr 1fr; gap: 14px; align-items: start; }
+    @media (max-width: 1050px) { .chartAndList { grid-template-columns: 1fr; } }
+    .panelTitle { display:flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 8px 0; }
+    .scroll { max-height: 520px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead th { position: sticky; top: 0; background: #fafafa; border-bottom: 1px solid #e5e7eb; text-align: left; padding: 10px; }
+    tbody td { border-bottom: 1px solid #f0f0f0; padding: 10px; vertical-align: top; }
+    tbody tr:hover { background: #fcfcfc; }
+    .mono { font-variant-numeric: tabular-nums; }
+    .right { text-align:right; }
+    .small { font-size: 11px; color:#6b7280; }
   </style>
 </head>
 <body>
@@ -32,9 +44,9 @@
     <div class="card">
       <h2 style="margin:0 0 8px 0;">Cheltuieli (auto-load)</h2>
       <div class="muted">
-        Această pagină încearcă să citească automat fișierul <b>cheltuieli.csv</b> aflat lângă <b>index.html</b>, prin <span class="pill">fetch</span>.
+        Pagina citește automat <b>cheltuieli.csv</b> aflat lângă <b>index.html</b>.
         <br/>
-        <b>Important:</b> trebuie rulată printr-un server local (ex: <code>python -m http.server 8000</code>) și deschisă la <code>http://localhost:8000</code>.
+        <b>Important:</b> rulează printr-un server local (ex: <code>python -m http.server 8000</code>) și deschide <code>http://localhost:8000/index.html</code>.
       </div>
 
       <div style="height:10px;"></div>
@@ -62,7 +74,36 @@
 
       <div style="height:14px;"></div>
 
-      <canvas id="chart"></canvas>
+      <div class="chartAndList">
+        <div>
+          <canvas id="chart"></canvas>
+        </div>
+
+        <div>
+          <div class="panelTitle">
+            <h3 style="margin:0;">Lista cheltuieli</h3>
+            <div class="small"><span id="listCount">0</span> intrări</div>
+          </div>
+          <div class="small" style="margin:0 0 8px 0;">
+            Lista respectă intervalul selectat (De la / Până la).
+          </div>
+          <div class="scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Categorie</th>
+                  <th class="right">Sumă</th>
+                  <th>Comentariu</th>
+                </tr>
+              </thead>
+              <tbody id="expenseTbody">
+                <tr><td colspan="4" class="muted">Încarc date...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -177,17 +218,19 @@ function normalizeForChart(filteredRows) {
   return { labels, datasets };
 }
 
-function renderChart() {
+function getFilteredRowsByRange() {
   const f = el('fromDate').value || null;
   const t = el('toDate').value || null;
-
-  const filtered = rows.filter(r => {
+  return rows.filter(r => {
     const iso = ymdToISO(Number(r.an), Number(r.luna), Number(r.zi));
     if (f && iso < f) return false;
     if (t && iso > t) return false;
     return true;
   });
+}
 
+function renderChart() {
+  const filtered = getFilteredRowsByRange();
   const { labels, datasets } = normalizeForChart(filtered);
 
   if (chart) chart.destroy();
@@ -209,6 +252,48 @@ function renderChart() {
       scales: { x: { stacked:true }, y: { stacked:true, beginAtZero:true } }
     }
   });
+}
+
+function buildExpenseEntries(filteredRows) {
+  // transformă formatul wide (o zi cu multe coloane) într-o listă "long"
+  const entries = [];
+  for (const r of filteredRows) {
+    const date = ymdToISO(Number(r.an), Number(r.luna), Number(r.zi));
+    const comment = (r.comentariu ?? '').toString().trim();
+    for (const c of categories) {
+      const amount = toNumber(r[c]);
+      if (amount !== 0) {
+        entries.push({ date, category: c, amount, comment });
+      }
+    }
+  }
+  entries.sort((a,b) => a.date.localeCompare(b.date) || a.category.localeCompare(b.category));
+  return entries;
+}
+
+function renderExpenseList() {
+  const filtered = getFilteredRowsByRange();
+  const entries = buildExpenseEntries(filtered);
+
+  el('listCount').textContent = String(entries.length);
+
+  const tbody = el('expenseTbody');
+  if (!entries.length) {
+    tbody.innerHTML = `<tr><td colspan="4" class="muted">Nu există cheltuieli în intervalul selectat.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = entries.map(e => {
+    const comm = e.comment ? e.comment.replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+    return `
+      <tr>
+        <td class="mono">${e.date}</td>
+        <td>${e.category}</td>
+        <td class="right mono">${e.amount.toFixed(2)}</td>
+        <td>${comm}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
 /** ======= Add/update ======= **/
@@ -250,7 +335,9 @@ function addExpense() {
   el('addComment').value = '';
   el('addMsg').innerHTML = `<span class="ok">OK:</span> ${iso} +${amount.toFixed(2)} la <b>${type}</b>.`;
 
+  // refresh UI
   renderChart();
+  renderExpenseList();
 }
 
 /** ======= Export ======= **/
@@ -299,7 +386,6 @@ function downloadText(filename, text) {
 
 /** ======= Auto-load cheltuieli.csv ======= **/
 async function loadCSV() {
-  // IMPORTANT: merge doar din http:// (server local), nu prin dublu-click (file://)
   const res = await fetch('cheltuieli.csv', { cache: 'no-store' });
   if (!res.ok) throw new Error(`Nu pot citi cheltuieli.csv (HTTP ${res.status}).`);
   const text = await res.text();
@@ -308,6 +394,7 @@ async function loadCSV() {
   inferSchema();
   suggestDateRangeDefaults();
   renderChart();
+  renderExpenseList();
 
   setStatus(`Încărcat automat cheltuieli.csv (${rows.length} zile)`, true);
 }
@@ -323,11 +410,12 @@ window.addEventListener('load', () => {
       <br/><span class="muted">Apoi deschide:</span> <code>http://localhost:8000/index.html</code>`,
       false
     );
+    el('expenseTbody').innerHTML = `<tr><td colspan="4" class="muted">Nu s-au putut încărca datele.</td></tr>`;
   });
 });
 
 /** ======= UI hooks ======= **/
-el('applyRange').addEventListener('click', renderChart);
+el('applyRange').addEventListener('click', () => { renderChart(); renderExpenseList(); });
 el('addBtn').addEventListener('click', addExpense);
 el('downloadBtn').addEventListener('click', () => downloadText('cheltuieli_updated.csv', toCSVWide()));
 el('downloadLongBtn').addEventListener('click', () => downloadText('cheltuieli_long.csv', toCSVLong()));
